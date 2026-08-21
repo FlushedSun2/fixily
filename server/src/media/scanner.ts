@@ -21,13 +21,23 @@ export interface ScanReport {
   errors: string[];
 }
 
-async function walk(dir: string, found: string[] = []): Promise<string[]> {
-  const entries = await readdir(dir, { withFileTypes: true });
+/**
+ * Collects video files below `dir`. A folder that cannot be read (permissions,
+ * a broken mount) is reported and skipped rather than aborting the whole scan.
+ */
+async function walk(dir: string, errors: string[], found: string[] = []): Promise<string[]> {
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch (error) {
+    errors.push(`${dir}: ${(error as Error).message}`);
+    return found;
+  }
   for (const entry of entries) {
     if (entry.name.startsWith('.')) continue;
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
-      await walk(full, found);
+      await walk(full, errors, found);
     } else if (VIDEO_EXTENSIONS.has(extname(entry.name).toLowerCase())) {
       found.push(full);
     }
@@ -59,7 +69,7 @@ export async function scanLibrary(library: LibraryRow): Promise<ScanReport> {
     return report;
   }
 
-  const files = await walk(root);
+  const files = await walk(root, report.errors);
   const existing = db
     .prepare('SELECT * FROM items WHERE library_id = ?')
     .all(library.id) as ItemRow[];

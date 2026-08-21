@@ -1,4 +1,4 @@
-import { existsSync, statSync } from 'node:fs';
+import { accessSync, constants, existsSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -31,7 +31,12 @@ export async function libraryRoutes(app: FastifyInstance): Promise<void> {
     }
     const path = resolve(parsed.data.path);
     if (!existsSync(path) || !statSync(path).isDirectory()) {
-      return reply.code(400).send({ error: `not a readable folder: ${path}` });
+      return reply.code(400).send({ error: `not a folder on this server: ${path}` });
+    }
+    try {
+      accessSync(path, constants.R_OK | constants.X_OK);
+    } catch {
+      return reply.code(400).send({ error: `the server cannot read this folder: ${path}` });
     }
     if (db.prepare('SELECT id FROM libraries WHERE path = ?').get(path)) {
       return reply.code(409).send({ error: 'a library already covers this folder' });

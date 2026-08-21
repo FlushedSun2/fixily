@@ -70,11 +70,17 @@ export function Libraries({ libraries, canManage, onChanged }: LibrariesProps) {
               <strong>{library.name}</strong>
               <span className="muted"> · {library.item_count} items · {library.path}</span>
               {reports[library.id] ? (
-                <p className="muted">
-                  Added {reports[library.id]?.added}, updated {reports[library.id]?.updated},
-                  removed {reports[library.id]?.removed}
-                  {reports[library.id]?.errors.length ? `, ${reports[library.id]?.errors.length} errors` : ''}
-                </p>
+                <>
+                  <p className="muted">
+                    Added {reports[library.id]?.added}, updated {reports[library.id]?.updated},
+                    removed {reports[library.id]?.removed}
+                  </p>
+                  {reports[library.id]?.errors.map((message) => (
+                    <p className="error" key={message}>
+                      {message}
+                    </p>
+                  ))}
+                </>
               ) : null}
             </div>
             {canManage ? (

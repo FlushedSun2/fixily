@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { createReadStream } from 'node:fs';
+import { createReadStream, existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { extname, join } from 'node:path';
 import type { FastifyInstance, FastifyReply } from 'fastify';
@@ -20,6 +20,8 @@ const MIME_TYPES: Record<string, string> = {
 
 const RANGE_PATTERN = /^bytes=(\d*)-(\d*)$/;
 
+const MISSING_FILE_MESSAGE = 'this file is no longer on disk, rescan the library';
+
 function findItem(id: string): ItemRow | undefined {
   return db.prepare('SELECT * FROM items WHERE id = ?').get(Number(id)) as ItemRow | undefined;
 }
@@ -38,6 +40,9 @@ export async function streamRoutes(app: FastifyInstance): Promise<void> {
     const { id } = request.params as { id: string };
     const item = findItem(id);
     if (!item?.artwork) return reply.code(404).send({ error: 'no artwork for this item' });
+    if (!existsSync(join(config.artworkDir, item.artwork))) {
+      return reply.code(404).send({ error: 'artwork is missing, rescan the library' });
+    }
     return reply
       .type('image/jpeg')
       .header('cache-control', 'public, max-age=86400')
@@ -58,6 +63,7 @@ export async function streamRoutes(app: FastifyInstance): Promise<void> {
     const { id } = request.params as { id: string };
     const item = findItem(id);
     if (!item) return reply.code(404).send({ error: 'item not found' });
+    if (!existsSync(item.path)) return reply.code(410).send({ error: MISSING_FILE_MESSAGE });
 
     const { size } = await stat(item.path);
     const contentType = MIME_TYPES[extname(item.path).toLowerCase()] ?? 'application/octet-stream';
@@ -86,6 +92,7 @@ export async function streamRoutes(app: FastifyInstance): Promise<void> {
     const { id } = request.params as { id: string };
     const item = findItem(id);
     if (!item) return reply.code(404).send({ error: 'item not found' });
+    if (!existsSync(item.path)) return reply.code(410).send({ error: MISSING_FILE_MESSAGE });
 
     const query = request.query as { start?: string };
     const start = Number(query.start ?? 0);

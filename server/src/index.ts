@@ -21,6 +21,16 @@ export async function buildServer() {
   await app.register(cors, { origin: true });
   await app.register(jwt, { secret: config.jwtSecret });
 
+  // Unexpected failures are logged with their route and reported without internals.
+  app.setErrorHandler((error, request, reply) => {
+    const status = error.statusCode && error.statusCode < 500 ? error.statusCode : 500;
+    if (status >= 500) {
+      request.log.error({ err: error, url: request.url }, 'request failed');
+      return reply.code(status).send({ error: 'the server hit an unexpected error' });
+    }
+    return reply.code(status).send({ error: error.message });
+  });
+
   app.get('/api/health', async () => ({ status: 'ok' }));
   await app.register(authRoutes);
   await app.register(libraryRoutes);
